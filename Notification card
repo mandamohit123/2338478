@@ -1,0 +1,72 @@
+import React from 'react';
+import {
+  Card, CardContent, Chip, Typography, Box, Tooltip
+} from '@mui/material';
+import {
+  Work, Assessment, Event, FiberNew, CheckCircleOutline
+} from '@mui/icons-material';
+
+const TYPE_CONFIG = {
+  Placement: { color: 'success',  icon: <Work fontSize="small" />,       bg: '#E8F5E9', border: '#4CAF50' },
+  Result:    { color: 'primary',  icon: <Assessment fontSize="small" />, bg: '#E3F2FD', border: '#2196F3' },
+  Event:     { color: 'warning',  icon: <Event fontSize="small" />,      bg: '#FFF8E1', border: '#FFC107' },
+};
+
+function formatTime(ts) {
+  try {
+    const d = new Date(ts.replace(' ', 'T'));
+    return d.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+  } catch { return ts; }
+}
+
+export default function NotificationCard({ notification, rank }) {
+  const { Type, Message, Timestamp, read } = notification;
+  const cfg = TYPE_CONFIG[Type] || { color: 'default', icon: null, bg: '#F5F5F5', border: '#9E9E9E' };
+
+  return (
+    <Card
+      sx={{
+        mb: 1.5,
+        border: `1px solid ${cfg.border}`,
+        bgcolor: read ? '#FAFAFA' : cfg.bg,
+        opacity: read ? 0.75 : 1,
+        transition: 'transform 0.15s, box-shadow 0.15s',
+        '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 6px 20px rgba(0,0,0,0.12)' },
+      }}
+    >
+      <CardContent sx={{ py: '12px !important', px: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+          {rank && (
+            <Typography variant="body2" sx={{ fontWeight: 800, color: 'text.secondary', minWidth: 24 }}>
+              #{rank}
+            </Typography>
+          )}
+
+          <Chip
+            icon={cfg.icon}
+            label={Type}
+            color={cfg.color}
+            size="small"
+            sx={{ fontWeight: 700, minWidth: 110 }}
+          />
+
+          <Typography variant="body1" sx={{ flexGrow: 1, fontWeight: read ? 400 : 600, color: 'text.primary' }}>
+            {Message}
+          </Typography>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 'auto' }}>
+            <Typography variant="caption" color="text.secondary">
+              {formatTime(Timestamp)}
+            </Typography>
+            <Tooltip title={read ? 'Read' : 'New'}>
+              {read
+                ? <CheckCircleOutline sx={{ fontSize: 18, color: 'text.disabled' }} />
+                : <FiberNew sx={{ fontSize: 18, color: '#E53935' }} />
+              }
+            </Tooltip>
+          </Box>
+        </Box>
+      </CardContent>
+    </Card>
+  );
+}
