@@ -1,0 +1,114 @@
+import heapq
+import requests
+from datetime import datetime
+ 
+# ── Configuration ────────────────────────────────────────────────────────────
+API_URL  = "http://4.224.186.213/evaluation-service/notifications"
+TOP_N    = 10          # change to 15, 20, … as per user preference
+ 
+# Weight map  (Placement > Result > Event)
+TYPE_WEIGHT = {
+    "Placement": 3,
+    "Result":    2,
+    "Event":     1,
+}
+# ─────────────────────────────────────────────────────────────────────────────
+ 
+ 
+def fetch_notifications() -> list[dict]:
+    """Fetch all notifications from the evaluation API."""
+    try:
+        response = requests.get(API_URL, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        return data.get("notifications", [])
+    except requests.exceptions.RequestException as e:
+        print(f"[ERROR] Could not reach the Notifications API: {e}")
+        # Return sample data for demonstration when API is unreachable
+        return [
+            {"ID": "d146095a-0d86-4a34-9e69-3900a14576bc", "Type": "Result",    "Message": "mid-sem",                      "Timestamp": "2026-04-22 17:51:30"},
+            {"ID": "b283218f-ea5a-4b7c-93a9-1f2f240d64b0", "Type": "Placement", "Message": "CSX Corporation hiring",        "Timestamp": "2026-04-22 17:51:18"},
+            {"ID": "81589ada-0ad3-4f77-9554-f52fb558e09d", "Type": "Event",     "Message": "farewell",                     "Timestamp": "2026-04-22 17:51:06"},
+            {"ID": "0005513a-142b-4bbc-8678-eefec65e1ede", "Type": "Result",    "Message": "mid-sem",                      "Timestamp": "2026-04-22 17:50:54"},
+            {"ID": "ea836726-c25e-4f21-a72f-544a6af8a37f", "Type": "Result",    "Message": "project-review",               "Timestamp": "2026-04-22 17:50:42"},
+            {"ID": "003cb427-8fc6-47f7-bb00-be228f6b0d2c", "Type": "Result",    "Message": "external",                     "Timestamp": "2026-04-22 17:50:30"},
+            {"ID": "e5c4ff20-31bf-4d40-8f02-72fda59e8918", "Type": "Result",    "Message": "project-review",               "Timestamp": "2026-04-22 17:50:18"},
+            {"ID": "1cfce5ee-ad37-4894-8946-d707627176a5", "Type": "Event",     "Message": "tech-fest",                    "Timestamp": "2026-04-22 17:50:06"},
+            {"ID": "cf2885a6-45ac-4ba0-b548-6e9e9d4c52c8", "Type": "Result",    "Message": "project-review",               "Timestamp": "2026-04-22 17:49:54"},
+            {"ID": "8a7412bd-6065-4d09-8501-a37f11cc848b", "Type": "Placement", "Message": "Advanced Micro Devices hiring", "Timestamp": "2026-04-22 17:49:42"},
+            {"ID": "aaa00001-0000-0000-0000-000000000001", "Type": "Event",     "Message": "orientation",                  "Timestamp": "2026-04-22 17:49:30"},
+            {"ID": "aaa00002-0000-0000-0000-000000000002", "Type": "Placement", "Message": "Google hiring",                "Timestamp": "2026-04-22 17:49:18"},
+            {"ID": "aaa00003-0000-0000-0000-000000000003", "Type": "Result",    "Message": "end-sem",                      "Timestamp": "2026-04-22 17:49:06"},
+        ]
+ 
+ 
+def compute_score(notification: dict) -> float:
+    """
+    Score = type_weight * 1e9 + unix_timestamp
+    Multiplying type_weight by a large constant ensures that a Placement
+    notification always outranks any Result, and a Result always outranks
+    any Event, regardless of recency.  Within the same type, more recent
+    notifications win via their larger unix timestamp.
+    """
+    type_weight = TYPE_WEIGHT.get(notification.get("Type", ""), 0)
+ 
+    ts_str = notification.get("Timestamp", "1970-01-01 00:00:00")
+    try:
+        ts = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S").timestamp()
+    except ValueError:
+        ts = 0.0
+ 
+    return type_weight * 1_000_000_000 + ts
+ 
+ 
+def get_top_n(notifications: list[dict], n: int = TOP_N) -> list[dict]:
+    """
+    Return the top-N notifications using a fixed-size min-heap.
+    This approach scales to a live stream: push each new notification
+    and pop when heap size exceeds N → O(log N) per item.
+    """
+    heap: list[tuple[float, int, dict]] = []   # (score, tie-break, notification)
+ 
+    for idx, notif in enumerate(notifications):
+        score = compute_score(notif)
+        heapq.heappush(heap, (score, idx, notif))
+        if len(heap) > n:
+            heapq.heappop(heap)   # evict the lowest-scored item
+ 
+    # Sort descending so index-0 is highest priority
+    top = sorted(heap, key=lambda x: x[0], reverse=True)
+    return [item[2] for item in top]
+ 
+ 
+def display_priority_inbox(top_notifications: list[dict]) -> None:
+    """Pretty-print the priority inbox."""
+    print("\n" + "═" * 65)
+    print(f"  🔔  CAMPUS PRIORITY INBOX  — Top {len(top_notifications)} Notifications")
+    print("═" * 65)
+    print(f"  {'#':<4} {'Type':<12} {'Message':<30} {'Timestamp'}")
+    print("─" * 65)
+ 
+    type_icons = {"Placement": "💼", "Result": "📊", "Event": "🎉"}
+ 
+    for rank, notif in enumerate(top_notifications, start=1):
+        ntype   = notif.get("Type", "Unknown")
+        message = notif.get("Message", "")
+        ts      = notif.get("Timestamp", "")
+        icon    = type_icons.get(ntype, "🔔")
+        print(f"  {rank:<4} {icon} {ntype:<10} {message:<30} {ts}")
+ 
+    print("═" * 65 + "\n")
+ 
+ 
+def main():
+    print("Fetching notifications from API …")
+    notifications = fetch_notifications()
+    print(f"Total notifications received: {len(notifications)}")
+ 
+    top_notifications = get_top_n(notifications, n=TOP_N)
+ 
+    display_priority_inbox(top_notifications)
+ 
+ 
+if __name__ == "__main__":
+    main()
