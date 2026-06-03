@@ -1,0 +1,49 @@
+import React from 'react';
+import { AppBar, Toolbar, Typography, Button, Box } from '@mui/material';
+import { NotificationsActive, Star } from '@mui/icons-material';
+import { useNavigate, useLocation } from 'react-router-dom';
+
+export default function Navbar() {
+  const navigate  = useNavigate();
+  const { pathname } = useLocation();
+
+  return (
+    <AppBar position="sticky" elevation={0}
+      sx={{ background: 'linear-gradient(90deg,#1565C0,#1976D2)', borderBottom: '1px solid rgba(255,255,255,0.15)' }}>
+      <Toolbar sx={{ gap: 1 }}>
+        <NotificationsActive sx={{ mr: 1 }} />
+        <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 800, letterSpacing: 0.5 }}>
+          Campus Notifications
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            color="inherit"
+            startIcon={<NotificationsActive />}
+            onClick={() => navigate('/')}
+            sx={{
+              borderRadius: 3,
+              px: 2,
+              bgcolor: pathname === '/' ? 'rgba(255,255,255,0.2)' : 'transparent',
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' },
+            }}
+          >
+            All
+          </Button>
+          <Button
+            color="inherit"
+            startIcon={<Star />}
+            onClick={() => navigate('/priority')}
+            sx={{
+              borderRadius: 3,
+              px: 2,
+              bgcolor: pathname === '/priority' ? 'rgba(255,255,255,0.2)' : 'transparent',
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' },
+            }}
+          >
+            Priority
+          </Button>
+        </Box>
+      </Toolbar>
+    </AppBar>
+  );
+}
