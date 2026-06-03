@@ -1,0 +1,63 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import axios from 'axios';
+
+const API_BASE = 'http://4.224.186.213/evaluation-service/notifications';
+const READ_KEY = 'campus_read_ids';
+
+function getReadIds() {
+  try { return new Set(JSON.parse(localStorage.getItem(READ_KEY) || '[]')); }
+  catch { return new Set(); }
+}
+function saveReadIds(ids) {
+  localStorage.setItem(READ_KEY, JSON.stringify([...ids]));
+}
+
+export default function useNotifications(params = {}) {
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading]             = useState(false);
+  const [error, setError]                 = useState(null);
+  const [total, setTotal]                 = useState(0);
+  const readIds = useRef(getReadIds());
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await axios.get(API_BASE, { params });
+      const raw = data.notifications || [];
+      setTotal(raw.length);
+
+      // Mark notifications as read/unread
+      const enriched = raw.map(n => ({
+        ...n,
+        read: readIds.current.has(n.ID),
+      }));
+      setNotifications(enriched);
+    } catch (e) {
+      setError(e.message || 'Failed to fetch notifications');
+      setNotifications([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [JSON.stringify(params)]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const markRead = useCallback((id) => {
+    readIds.current.add(id);
+    saveReadIds(readIds.current);
+    setNotifications(prev =>
+      prev.map(n => n.ID === id ? { ...n, read: true } : n)
+    );
+  }, []);
+
+  const markAllRead = useCallback(() => {
+    setNotifications(prev => {
+      prev.forEach(n => readIds.current.add(n.ID));
+      saveReadIds(readIds.current);
+      return prev.map(n => ({ ...n, read: true }));
+    });
+  }, []);
+
+  return { notifications, loading, error, total, refetch: fetchData, markRead, markAllRead };
+}
