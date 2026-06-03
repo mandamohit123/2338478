@@ -1,0 +1,109 @@
+import React, { useState, useMemo } from 'react';
+import {
+  Container, Box, Typography, Slider, CircularProgress,
+  Alert, Button, Paper, Chip, Tooltip, IconButton
+} from '@mui/material';
+import { Star, Refresh, EmojiEvents } from '@mui/icons-material';
+import useNotifications from '../components/useNotifications';
+import NotificationCard from '../components/NotificationCard';
+
+const TYPE_WEIGHT = { Placement: 3, Result: 2, Event: 1 };
+
+function computeScore(n) {
+  const w  = TYPE_WEIGHT[n.Type] || 0;
+  const ts = new Date(n.Timestamp.replace(' ', 'T')).getTime() / 1000 || 0;
+  return w * 1_000_000_000 + ts;
+}
+
+function getTopN(notifications, n) {
+  return [...notifications]
+    .sort((a, b) => computeScore(b) - computeScore(a))
+    .slice(0, n);
+}
+
+export default function PriorityInbox() {
+  const [topN, setTopN] = useState(10);
+  const { notifications, loading, error, refetch } = useNotifications({ limit: 100 });
+
+  const topNotifications = useMemo(
+    () => getTopN(notifications, topN),
+    [notifications, topN]
+  );
+
+  const placementCount = topNotifications.filter(n => n.Type === 'Placement').length;
+  const resultCount    = topNotifications.filter(n => n.Type === 'Result').length;
+  const eventCount     = topNotifications.filter(n => n.Type === 'Event').length;
+
+  return (
+    <Container maxWidth="md" sx={{ py: 4 }}>
+      {/* Header */}
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 1 }}>
+        <EmojiEvents sx={{ color: '#FFC107', fontSize: 32 }} />
+        <Box sx={{ flexGrow: 1 }}>
+          <Typography variant="h5">Priority Inbox</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Top notifications ranked by type weight × recency
+          </Typography>
+        </Box>
+        <Tooltip title="Refresh">
+          <IconButton onClick={refetch} color="primary"><Refresh /></IconButton>
+        </Tooltip>
+      </Box>
+
+      {/* Top-N Slider */}
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Typography gutterBottom fontWeight={600}>
+          Show top <span style={{ color: '#1565C0', fontSize: '1.2em' }}>{topN}</span> notifications
+        </Typography>
+        <Slider
+          value={topN}
+          min={5} max={20} step={5}
+          marks={[
+            { value: 5,  label: '5'  },
+            { value: 10, label: '10' },
+            { value: 15, label: '15' },
+            { value: 20, label: '20' },
+          ]}
+          onChange={(_, v) => setTopN(v)}
+          color="primary"
+          sx={{ maxWidth: 400 }}
+        />
+
+        {/* Summary chips */}
+        <Box sx={{ display: 'flex', gap: 1, mt: 2, flexWrap: 'wrap' }}>
+          <Chip icon={<Star />} label={`${placementCount} Placements`} color="success" size="small" />
+          <Chip label={`${resultCount} Results`}   color="primary" size="small" />
+          <Chip label={`${eventCount} Events`}     color="warning" size="small" />
+        </Box>
+      </Paper>
+
+      {/* Priority rule explanation */}
+      <Alert severity="info" sx={{ mb: 3 }}>
+        <strong>Priority rule:</strong> Placement &gt; Result &gt; Event — ties broken by recency.
+      </Alert>
+
+      {/* Content */}
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+          <CircularProgress />
+        </Box>
+      )}
+
+      {error && (
+        <Alert severity="error" action={
+          <Button color="inherit" size="small" onClick={refetch}>Retry</Button>
+        }>
+          {error}
+        </Alert>
+      )}
+
+      {!loading && !error && topNotifications.length === 0 && (
+        <Alert severity="info">No notifications available.</Alert>
+      )}
+
+      {!loading && topNotifications.map((n, idx) => (
+        <NotificationCard key={n.ID} notification={n} rank={idx + 1} />
+      ))}
+    </Container>
+  );
+}
