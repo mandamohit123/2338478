@@ -1,0 +1,104 @@
+import React, { useState } from 'react';
+import {
+  Container, Box, Typography, TextField, MenuItem,
+  Button, CircularProgress, Alert, Pagination,
+  Chip, Stack, IconButton, Tooltip
+} from '@mui/material';
+import {
+  Refresh, DoneAll, FilterList
+} from '@mui/icons-material';
+import useNotifications from '../components/useNotifications';
+import NotificationCard from '../components/NotificationCard';
+
+const PAGE_SIZE = 10;
+const TYPES = ['All', 'Placement', 'Result', 'Event'];
+
+export default function AllNotifications() {
+  const [page, setPage]   = useState(1);
+  const [type, setType]   = useState('All');
+
+  const params = {
+    limit: PAGE_SIZE,
+    page,
+    ...(type !== 'All' && { notification_type: type }),
+  };
+
+  const { notifications, loading, error, refetch, markAllRead } = useNotifications(params);
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  return (
+    <Container maxWidth="md" sx={{ py: 4 }}>
+      {/* Header */}
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 1 }}>
+        <Box sx={{ flexGrow: 1 }}>
+          <Typography variant="h5">All Notifications</Typography>
+          {unreadCount > 0 && (
+            <Typography variant="body2" color="text.secondary">
+              {unreadCount} unread
+            </Typography>
+          )}
+        </Box>
+        <Tooltip title="Mark all read">
+          <IconButton onClick={markAllRead} color="primary"><DoneAll /></IconButton>
+        </Tooltip>
+        <Tooltip title="Refresh">
+          <IconButton onClick={refetch} color="primary"><Refresh /></IconButton>
+        </Tooltip>
+      </Box>
+
+      {/* Filters */}
+      <Box sx={{ display: 'flex', gap: 2, mb: 3, alignItems: 'center', flexWrap: 'wrap' }}>
+        <FilterList color="action" />
+        <Stack direction="row" spacing={1}>
+          {TYPES.map(t => (
+            <Chip
+              key={t}
+              label={t}
+              onClick={() => { setType(t); setPage(1); }}
+              color={type === t ? 'primary' : 'default'}
+              variant={type === t ? 'filled' : 'outlined'}
+              sx={{ fontWeight: 600, cursor: 'pointer' }}
+            />
+          ))}
+        </Stack>
+      </Box>
+
+      {/* Content */}
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+          <CircularProgress />
+        </Box>
+      )}
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} action={
+          <Button color="inherit" size="small" onClick={refetch}>Retry</Button>
+        }>
+          {error}
+        </Alert>
+      )}
+
+      {!loading && !error && notifications.length === 0 && (
+        <Alert severity="info">No notifications found.</Alert>
+      )}
+
+      {!loading && notifications.map(n => (
+        <NotificationCard key={n.ID} notification={n} />
+      ))}
+
+      {/* Pagination */}
+      {!loading && notifications.length > 0 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+          <Pagination
+            count={Math.max(page, notifications.length === PAGE_SIZE ? page + 1 : page)}
+            page={page}
+            onChange={(_, v) => setPage(v)}
+            color="primary"
+            shape="rounded"
+          />
+        </Box>
+      )}
+    </Container>
+  );
+}
